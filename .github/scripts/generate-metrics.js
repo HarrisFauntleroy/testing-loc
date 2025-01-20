@@ -1,33 +1,36 @@
-// First, add "type": "module" to package.json or rename this file to .mjs
 import { simpleGit } from 'simple-git';
 import fs from 'fs';
 import { JSDOM } from 'jsdom';
 import * as d3 from 'd3';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
+
+const exec = promisify(execCallback);
 
 async function countLinesInCommit(git, commitHash) {
     await git.checkout(commitHash);
     
     // Get all files in the repository, excluding .git directory
-    const files = await new Promise((resolve, reject) => {
-        const { exec } = require('child_process');
-        exec('git ls-files', (error, stdout, stderr) => {
-            if (error) reject(error);
-            resolve(stdout.split('\n').filter(Boolean));
-        });
-    });
-    
-    let totalLines = 0;
-    
-    for (const file of files) {
-        try {
-            const content = await fs.promises.readFile(file, 'utf8');
-            totalLines += content.split('\n').length;
-        } catch (error) {
-            console.warn(`Skipping file ${file}: ${error.message}`);
+    try {
+        const { stdout } = await exec('git ls-files');
+        const files = stdout.split('\n').filter(Boolean);
+        
+        let totalLines = 0;
+        
+        for (const file of files) {
+            try {
+                const content = await fs.promises.readFile(file, 'utf8');
+                totalLines += content.split('\n').length;
+            } catch (error) {
+                console.warn(`Skipping file ${file}: ${error.message}`);
+            }
         }
+        
+        return totalLines;
+    } catch (error) {
+        console.error('Error listing files:', error);
+        return 0;
     }
-    
-    return totalLines;
 }
 
 async function generateMetrics() {
@@ -45,6 +48,7 @@ async function generateMetrics() {
             date: new Date(commit.date),
             lines: lines
         });
+        console.log(`Processed commit ${commit.hash}: ${lines} lines`);
     }
     
     // Generate SVG using D3
