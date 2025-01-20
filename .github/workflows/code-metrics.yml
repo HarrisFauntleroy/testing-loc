@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       
-      - name: Count lines and generate SVG
+      - name: Generate metrics
         run: node .github/scripts/generate-metrics.js
       
       - name: Commit and push if changed
