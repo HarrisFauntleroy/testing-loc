@@ -1,7 +1,8 @@
-const { simpleGit } = require('simple-git');
-const fs = require('fs');
-const d3 = require('d3');
-const { JSDOM } = require('jsdom');
+// First, add "type": "module" to package.json or rename this file to .mjs
+import { simpleGit } from 'simple-git';
+import fs from 'fs';
+import { JSDOM } from 'jsdom';
+import * as d3 from 'd3';
 
 async function countLinesInCommit(git, commitHash) {
     await git.checkout(commitHash);
