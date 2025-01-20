@@ -21,10 +21,19 @@ jobs:
         with:
           node-version: '18'
       
-      - name: Install dependencies
+      - name: Create package.json
         run: |
-          npm install simple-git
-          npm install d3
+          echo '{
+            "type": "module",
+            "dependencies": {
+              "simple-git": "^3.22.0",
+              "d3": "^7.8.5",
+              "jsdom": "^24.0.0"
+            }
+          }' > package.json
+      
+      - name: Install dependencies
+        run: npm install
       
       - name: Count lines and generate SVG
         run: node .github/scripts/generate-metrics.js
