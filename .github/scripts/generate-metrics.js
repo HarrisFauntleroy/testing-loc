@@ -6,37 +6,44 @@ import * as d3 from 'd3';
 async function generateMetrics() {
     const git = simpleGit();
     
-    // Get log with numstat for detailed statistics
-    const logs = await git.log(['--reverse', '--numstat']);
+    // Get all commits with their stats
+    const logs = await git.raw(['log', '--reverse', '--numstat', '--pretty=format:{"hash":"%H","date":"%aI"}']);
     
-    // Process commit stats
+    // Split the log output into commits
+    const commitChunks = logs.split('\n\n');
+    
     let totalLines = 0;
-    const metrics = logs.all.map(commit => {
-        // Parse the numstat output to get insertions and deletions
+    const metrics = [];
+    
+    // Process each commit
+    for (let chunk of commitChunks) {
+        const lines = chunk.split('\n');
+        const commitInfo = JSON.parse(lines[0]);
+        
+        // Process the numstat lines that follow
         let insertions = 0;
         let deletions = 0;
         
-        if (commit.diff) {
-            commit.diff.split('\n').forEach(line => {
-                if (line.trim()) {
-                    const [ins, del] = line.split('\t').map(n => parseInt(n) || 0);
-                    insertions += ins;
-                    deletions += del;
-                }
-            });
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const [ins, del] = line.split('\t').map(n => isNaN(parseInt(n)) ? 0 : parseInt(n));
+                insertions += ins || 0;
+                deletions += del || 0;
+            }
         }
-
+        
         totalLines += (insertions - deletions);
         
-        return {
-            date: new Date(commit.date),
+        metrics.push({
+            date: new Date(commitInfo.date),
             total: totalLines,
             insertions,
             deletions
-        };
-    });
-
-    console.log('First few metrics entries:', metrics.slice(0, 3));
+        });
+        
+        console.log(`Commit ${commitInfo.hash}: +${insertions} -${deletions} = ${totalLines}`);
+    }
 
     // Set up SVG
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
@@ -67,7 +74,10 @@ async function generateMetrics() {
         .range([0, width]);
     
     const y = d3.scaleLinear()
-        .domain([0, d3.max(metrics, d => d.total) * 1.1])
+        .domain([
+            Math.min(0, d3.min(metrics, d => d.total)),
+            Math.max(0, d3.max(metrics, d => d.total))
+        ])
         .nice()
         .range([height, 0]);
     
@@ -80,11 +90,11 @@ async function generateMetrics() {
             .tickFormat('')
         );
     
-    // Add the line with a fun style (similar to XKCD)
+    // Add the line
     const lineGenerator = d3.line()
         .x(d => x(d.date))
         .y(d => y(d.total))
-        .curve(d3.curveBasis); // Makes the line slightly wobbly
+        .curve(d3.curveBasis);
     
     g.append('path')
         .datum(metrics)
@@ -108,23 +118,23 @@ async function generateMetrics() {
         .attr('transform', `translate(0,${height})`)
         .call(xAxis)
         .style('font-size', '12px')
-        .style('font-family', 'Comic Sans MS, cursive')
+        .style('font-family', 'system-ui, -apple-system, sans-serif')
         .call(g => g.select('.domain').attr('stroke-width', 2));
     
     g.append('g')
         .call(yAxis)
         .style('font-size', '12px')
-        .style('font-family', 'Comic Sans MS, cursive')
+        .style('font-family', 'system-ui, -apple-system, sans-serif')
         .call(g => g.select('.domain').attr('stroke-width', 2));
     
-    // Add axis labels with hand-drawn style
+    // Add axis labels
     g.append('text')
         .attr('transform', 'rotate(-90)')
         .attr('y', -margin.left + 20)
         .attr('x', -height / 2)
         .attr('text-anchor', 'middle')
         .style('font-size', '14px')
-        .style('font-family', 'Comic Sans MS, cursive')
+        .style('font-family', 'system-ui, -apple-system, sans-serif')
         .text('Lines of Code');
     
     g.append('text')
@@ -132,16 +142,17 @@ async function generateMetrics() {
         .attr('y', height + margin.bottom - 10)
         .attr('text-anchor', 'middle')
         .style('font-size', '14px')
-        .style('font-family', 'Comic Sans MS, cursive')
+        .style('font-family', 'system-ui, -apple-system, sans-serif')
         .text('Time →');
     
-    // Add title with hand-drawn style
+    // Add title
     g.append('text')
         .attr('x', width / 2)
         .attr('y', -margin.top / 2)
         .attr('text-anchor', 'middle')
         .style('font-size', '18px')
-        .style('font-family', 'Comic Sans MS, cursive')
+        .style('font-family', 'system-ui, -apple-system, sans-serif')
+        .style('font-weight', 'bold')
         .text('Lines of Code Over Time');
     
     // Save the SVG
