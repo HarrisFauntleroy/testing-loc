@@ -5,28 +5,38 @@ import * as d3 from 'd3';
 
 async function generateMetrics() {
     const git = simpleGit();
-    const logs = await git.log(['--reverse', '--stat']);
+    
+    // Get log with numstat for detailed statistics
+    const logs = await git.log(['--reverse', '--numstat']);
     
     // Process commit stats
     let totalLines = 0;
     const metrics = logs.all.map(commit => {
-        // Parse the stats summary to get insertions and deletions
-        const stats = commit.diff ? commit.diff.split(', ').reduce((acc, curr) => {
-            if (curr.includes('insertion')) {
-                acc.insertions = parseInt(curr.split(' ')[0]) || 0;
-            } else if (curr.includes('deletion')) {
-                acc.deletions = parseInt(curr.split(' ')[0]) || 0;
-            }
-            return acc;
-        }, { insertions: 0, deletions: 0 }) : { insertions: 0, deletions: 0 };
+        // Parse the numstat output to get insertions and deletions
+        let insertions = 0;
+        let deletions = 0;
+        
+        if (commit.diff) {
+            commit.diff.split('\n').forEach(line => {
+                if (line.trim()) {
+                    const [ins, del] = line.split('\t').map(n => parseInt(n) || 0);
+                    insertions += ins;
+                    deletions += del;
+                }
+            });
+        }
 
-        totalLines += (stats.insertions - stats.deletions);
+        totalLines += (insertions - deletions);
         
         return {
             date: new Date(commit.date),
-            total: totalLines
+            total: totalLines,
+            insertions,
+            deletions
         };
     });
+
+    console.log('First few metrics entries:', metrics.slice(0, 3));
 
     // Set up SVG
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
