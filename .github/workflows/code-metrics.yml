@@ -1,0 +1,38 @@
+name: Code Metrics Tracker
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  track-metrics:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: |
+          npm install simple-git
+          npm install d3
+      
+      - name: Count lines and generate SVG
+        run: node .github/scripts/generate-metrics.js
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add metrics.svg
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update code metrics visualization"
+          git push
